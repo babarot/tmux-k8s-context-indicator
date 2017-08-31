@@ -1,0 +1,63 @@
+#!/bin/zsh
+
+while (( $# > 0 ))
+do
+    case "$1" in
+        (-h | --help)
+            cat "$0" | awk '/^while/,/^done/' >&2
+            exit 1
+            ;;
+        (--trim-prefix)
+            prefix="$2"
+            if [[ -z "$prefix" ]]; then
+                echo "$1: require argument" >&2
+                exit 1
+            fi
+            shift
+            ;;
+        (--truncate-length)
+            length="$2"
+            if [[ -z "$length" ]]; then
+                echo "$1: require argument" >&2
+                exit 1
+            fi
+            shift
+            ;;
+        (--silent)
+            # Suppress all stderr
+            exec 2> /dev/null
+            ;;
+        (-* | --*)
+            echo "$1: no such option" >&2
+            exit 1
+            ;;
+        (*)
+            # skip
+            ;;
+    esac
+    shift
+done
+
+if (( ! $+commands[kubectl] )); then
+    echo "kubectl: not found" >&2
+    exit 1
+fi
+
+if ! context="$(kubectl config current-context 2>/dev/null)"; then
+    echo "NaN"
+    exit 0
+fi
+
+namespace="$(kubectl config view -o "jsonpath={.contexts[?(@.name==\"$context\")].context.namespace}")"
+if [[ -z "$namespace" ]]; then
+    namespace="default"
+fi
+if [[ -n "$prefix" ]]; then
+    context="${context#$prefix}"
+fi
+
+if [[ -n $length ]]; then
+    print -P "%$((length+3))>...>${context}%<</${namespace}"
+else
+    echo "${context}/${namespace}"
+fi
